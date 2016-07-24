@@ -1,0 +1,5 @@
+## files to ignore
+apikey.txt
+
+## because i don't have my structure set up properly and this build file is dumped out here
+monitor
