@@ -16,3 +16,7 @@ f) Get nice and valid HTML and CSS
 g) Add a handler to go to a home page (With Uptime Robot summary display)
 h) Add in a basic navigation
 i) Anything else I can think of....
+
+
+
+Learn from: https://golang.org/doc/articles/wiki/
