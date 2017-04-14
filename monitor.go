@@ -1,80 +1,114 @@
 package main
 
 import (
-  "fmt"
-  "io/ioutil"
-  "net/http"
-  "html/template"
+	"encoding/xml"
+	"fmt"
+	"html/template"
+	"io/ioutil"
+	"log"
+	"net/http"
+	"os"
 )
 
+type Monitors struct {
+	Monitors []Monitor `xml:"monitors>monitor"`
+}
+
 type Monitor struct {
-  Id  int
-  FriendlyName  string
-  Url string
-  Type int
-  SubType string
-  KeywordType int
-  KeywordValue int
-  HttpUsername string
-  HttpPassword string
-  Port int
-  Interval int
-  Status int
-  AllTimeUpTimerRatio int64
+	Id                  int    `xml:"id"`
+	FriendlyName        string `xml:"friendlyname"`
+	Url                 string `xml:"url"`
+	Type                int    `xml:"type"`
+	SubType             string `xml:"subtype"`
+	KeywordType         int    `xml:"keywordtype"`
+	KeywordValue        int    `xml:"keywordvalue"`
+	HttpUsername        string `xml:"httpusername"`
+	HttpPassword        string `xml:"httppassword"`
+	Port                int    `xml:"port"`
+	Interval            int    `xml:"interval"`
+	Status              int    `xml:"status"`
+	AllTimeUpTimerRatio int64  `xml:"alltimeuptimeratio"`
 }
 
 func loadApiKey(fileName string) (string, error) {
-  key, err := ioutil.ReadFile(fileName)
-  if err != nil {
-    return "", err
-  }
-  return string(key), nil
+	key, err := ioutil.ReadFile(fileName)
+	if err != nil {
+		return "", err
+	}
+	return string(key), nil
 }
 
 func indexHandler(w http.ResponseWriter, r *http.Request) {
-  key, _ := loadApiKey("apikey.txt")
-  fmt.Fprintf(w, "<h1>Uptime Robot Monitors</h1><div>API key: %s</div>", key)
-  fmt.Fprintf(w, "<a href=\"/list\">List all monitors</a>")
+	key, _ := loadApiKey("apikey.txt")
+	fmt.Fprintf(w, "<h1>Uptime Robot Monitors</h1><div>API key: %s</div>", key)
+	fmt.Fprintf(w, "<a href=\"/list\">List all monitors</a>")
 }
 
 func listHandler(w http.ResponseWriter, r *http.Request) {
-  key, _ := loadApiKey("apikey.txt")
-  t, _ := template.ParseFiles("Templates/ListMonitors.html")
+	key, _ := loadApiKey("apikey.txt")
+	t, _ := template.ParseFiles("Templates/ListMonitors.html")
 
-  //Call UTR and get a list of monitors back
-  response, err := http.Get("https://api.uptimerobot.com/getMonitors?apiKey=" + key)
-  if err != nil {
-    fmt.Println(err)
-    return
-      //log.Fatal(err)
-  }
-  defer response.Body.Close()
-  responseData, _ := ioutil.ReadAll(response.Body)
+	//Call UTL and get a list of monitors back
 
-  responseString := string(responseData)
-  fmt.Println(responseString)
+	//********************
 
-  //Parse this list into a data structure
-  m := &Monitor{FriendlyName: "Bob", Status: 1}
+	//http.Get thows a 'malformed HTTP status code' error message if we append the key to the URL as below.
+	//If we hard code the key in the string is works fine. WHY?????
+	//When the error is shown the erorr message also shows the URL with the key applied fine, so why the erorr!!!!
 
+	//********************
 
-  //Pass data structure to the template for display
+	url := "https://api.uptimerobot.com/getMonitors?apiKey=" + key
+	response, err := http.Get(url)
+	if err != nil {
+		log.Fatal("HTTP GET error: ", err)
+		return
+	}
+	defer response.Body.Close()
 
-  t.Execute(w, m)
+	if response.StatusCode != http.StatusOK {
+		log.Fatal("HTTP status error: ", response.StatusCode)
+		return
+	}
+
+	data, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		log.Fatal("HTTP/IO read body error: ", err)
+		return
+	}
+
+	log.Println(string(data))
+
+	// defer response.Body.Close()
+	// responseData, _ := ioutil.ReadAll(response.Body)
+
+	// responseString := string(responseData)
+	// fmt.Println(responseString)
+
+	//Parse this list into a data structure
+	//m := &Monitor{FriendlyName: "Bob", Status: 1}
+	m := Monitors{}
+	if err := xml.Unmarshal(data, &m); err != nil {
+		fmt.Println("Error:", err)
+		os.Exit(1)
+	} else if len(m.Monitors) != 0 {
+		//Pass data structure to the template for display
+		t.Execute(w, m)
+	}
 }
 
 func viewHandler(w http.ResponseWriter, r *http.Request) {
-  t, _ := template.ParseFiles("Templates/SingleMonitor.html")
+	t, _ := template.ParseFiles("Templates/SingleMonitor.html")
 
-  m := &Monitor{FriendlyName: "Bob", Status: 1}
+	m := &Monitor{FriendlyName: "Bob", Status: 1}
 
-  t.Execute(w, m)
+	t.Execute(w, m)
 }
 
 func main() {
-  http.HandleFunc("/", indexHandler)        //Index
-  http.HandleFunc("/list/", listHandler)    //List of avail monitors
-  http.HandleFunc("/view/", viewHandler)    //View a single monitor
+	http.HandleFunc("/", indexHandler)     //Index
+	http.HandleFunc("/list/", listHandler) //List of avail monitors
+	http.HandleFunc("/view/", viewHandler) //View a single monitor
 
-  http.ListenAndServe(":8080", nil)
+	http.ListenAndServe(":8080", nil)
 }
