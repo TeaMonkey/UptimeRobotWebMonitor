@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"encoding/xml"
 	"fmt"
 	"html/template"
@@ -31,11 +32,33 @@ type Monitor struct {
 }
 
 func loadApiKey(fileName string) (string, error) {
-	key, err := ioutil.ReadFile(fileName)
+	//This method adds a byte 10 to the end of the byte array for any file read
+	//This 10 causes the http.Get call to throw a 'malformed HTTP status code "XXX'
+	//error. Error in go 1.7.4 and 1.8.1, don't thik go 1.6 did this
+	//Using the bufio.NewScanner thing as this works OK
+	//key, err := ioutil.ReadFile(fileName)
+	key := ""
+
+	f, err := os.Open(fileName)
+	scanner := bufio.NewScanner(f)
+
+	for scanner.Scan() {
+		key += scanner.Text()
+	}
+	defer f.Close()
+
 	if err != nil {
 		return "", err
 	}
+
+	// fmt.Println(key) // print the content as 'bytes'
+
+	// str := string(key) // convert content to a 'string'
+
+	// fmt.Println(str) // print the content as a 'string'
+
 	return string(key), nil
+
 }
 
 func indexHandler(w http.ResponseWriter, r *http.Request) {
@@ -49,15 +72,6 @@ func listHandler(w http.ResponseWriter, r *http.Request) {
 	t, _ := template.ParseFiles("Templates/ListMonitors.html")
 
 	//Call UTL and get a list of monitors back
-
-	//********************
-
-	//http.Get thows a 'malformed HTTP status code' error message if we append the key to the URL as below.
-	//If we hard code the key in the string is works fine. WHY?????
-	//When the error is shown the erorr message also shows the URL with the key applied fine, so why the erorr!!!!
-
-	//********************
-
 	url := "https://api.uptimerobot.com/getMonitors?apiKey=" + key
 	response, err := http.Get(url)
 	if err != nil {
@@ -93,8 +107,10 @@ func listHandler(w http.ResponseWriter, r *http.Request) {
 		os.Exit(1)
 	} else if len(m.Monitors) != 0 {
 		//Pass data structure to the template for display
+		log.Fatal("HERE")
 		t.Execute(w, m)
 	}
+	log.Fatal("Array size: ", len(m.Monitors))
 }
 
 func viewHandler(w http.ResponseWriter, r *http.Request) {
